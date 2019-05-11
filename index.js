@@ -1,4 +1,5 @@
 var http = require('http');
+var debug = require('debug')('rest-server-passport')
 var https = require('https');
 var fs = require('fs');
 var express = require('express');
@@ -61,7 +62,9 @@ app.set('port', port);
 app.set('secPort', port + 443);
 
 var server = http.createServer(app);
-server.listen(port);
+server.listen(port, function() {
+    console.log('Server listening on port ', port);
+});
 server.on('error', onError);
 server.on('listening', onListening)
 
@@ -78,6 +81,7 @@ secureServer.listen(app.get('secPort'), function() {
     console.log('Server listening on port ', app.get('secPort'));
 });
 secureServer.on('error', onError);
+server.on('listening', onListening)
 
 /**
  * Event listener for HTTP server "error" event.
@@ -114,5 +118,5 @@ function onListening() {
     var bind = typeof addr === 'string'
     ? 'pipe ' + addr
     : 'port ' + addr.port;
-    console.log('Listening on ' + bind);
+    debug('Listening on ' + bind);
 }
