@@ -1,3 +1,6 @@
+var http = require('http');
+var https = require('https');
+var fs = require('fs');
 var express = require('express');
 var bodyParser = require('body-parser');
 var mongoose = require('mongoose');
@@ -17,6 +20,15 @@ var hostname = 'localhost';
 var port = 3000;
 
 var app = express();
+
+// Secure traffic only
+app.all('*', function(req, res, next) {
+    if (req.secure) {
+        return next();
+    }
+    res.redirect('https://' + req.hostname + ':' + app.get('secPort') + req.url);
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -26,6 +38,10 @@ app.use(passport.initialize());
 passport.use(new LocalStrategy(User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
+
+app.use('/', function(req, res, next) {
+    res.send("Hello world!");
+});
 
 var users = require('./routes/users');
 app.use('/users', users);
@@ -37,6 +53,66 @@ app.use(function(err, req, res, next) {
     });
 });
 
-app.listen(port, hostname, function() {
-    console.log(`Server running at http://${hostname}:${port}`);
+// app.listen(port, hostname, function() {
+//     console.log(`Server running at http://${hostname}:${port}`);
+// });
+
+app.set('port', port);
+app.set('secPort', port + 443);
+
+var server = http.createServer(app);
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening)
+
+/**
+ * Create HTTPS server
+ */
+var options = {
+    key: fs.readFileSync(__dirname + '/private.key'),
+    cert: fs.readFileSync(__dirname + '/certificate.pem')
+};
+
+var secureServer = https.createServer(options, app);
+secureServer.listen(app.get('secPort'), function() {
+    console.log('Server listening on port ', app.get('secPort'));
 });
+secureServer.on('error', onError);
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+    case 'EACCES':
+        console.error(bind + ' requires elevated privileges');
+        process.exit(1);
+        break;
+    case 'EADDRINUSE':
+        console.error(bind + ' is already in use');
+        process.exit(1);
+        break;
+    default:
+        throw error;
+    }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+function onListening() {
+    var addr = server.address();
+    var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+    console.log('Listening on ' + bind);
+}
